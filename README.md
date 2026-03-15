@@ -1,7 +1,7 @@
 # Transformer From Scratch
 
 This repository is a deep dive into the Transformer architecture introduced in the paper
-[Attention Is All You Need](https://arxiv.org/pdf/1706.03762).
+"Attention Is All You Need".
 
 The goal of this project is to implement the complete encoder–decoder Transformer architecture from 
 first principles using PyTorch, building each component step-by-step to develop a deep understanding 
