@@ -5,7 +5,7 @@ This repository is a deep dive into the Transformer architecture introduced in t
 
 ## Transformer Architecture
 
-![Transformer Architecture](assets/transformer.png)
+![Transformer Architecture](assets/transformer_architecture.png)
 
 *Figure: Encoder–decoder Transformer architecture from "Attention Is All You Need" (Vaswani et al., 2017).*
 
