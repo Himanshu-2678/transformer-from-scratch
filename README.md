@@ -3,6 +3,12 @@
 This repository is a deep dive into the Transformer architecture introduced in the paper
 "Attention Is All You Need".
 
+## Transformer Architecture
+
+![Transformer Architecture](assets/transformer.png)
+
+*Figure: Encoder–decoder Transformer architecture from "Attention Is All You Need" (Vaswani et al., 2017).*
+
 The goal of this project is to implement the complete encoder–decoder Transformer architecture from 
 first principles using PyTorch, building each component step-by-step to develop a deep understanding 
 of attention-based models.
