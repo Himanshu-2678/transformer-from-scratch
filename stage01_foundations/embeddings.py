@@ -1,124 +1,160 @@
-import torch 
+# stage01_foundations/embeddings.py
+
+import torch
 import torch.nn as nn
 import math
 
+
 class TokenEmbedding(nn.Module):
     """
-    Convert integer token IDs into dense float vector.
-    this is usually a learned lookup table. During training, PyTorch adjust
-    these vectors by gradient descent so that semantically similar vector end
-    up very close to each other.
+    Converts integer token IDs into dense float vectors.
 
-    Args: vocab_size = V = total numbers of tokens in vocabulary.
-          d_model = Embedding dimension. This is the core hyperparameter that
-                    flows through the entire transformer.
-                    (d in the paper: 512)
+    Think of this as a lookup table of shape [vocab_size, d_model].
+    Every token in our vocabulary gets its own row which is a learned vector
+    that captures what that token means. During training, gradient descent
+    nudges these vectors so that tokens used in similar contexts end up
+    close together in this d_model-dimensional space.
+
+    The scaling by sqrt(d_model) is from the original paper. Without it,
+    embeddings tend to be much smaller in magnitude than the positional
+    encodings we add in Stage 4, and the model loses positional information.
+    Scaling brings them to the same order of magnitude.
+
+    Args:
+        vocab_size: Total number of tokens V. Get this from tokenizer.vocab_size.
+        d_model:    Embedding dimension. Every single layer in the transformer
+                    uses this same number. It's the backbone hyperparameter.
+                    Paper uses 512. We'll use smaller values for learning.
+        dropout_p:  Dropout probability applied after embedding + scale.
+                    Paper uses 0.1. Set 0.0 to disable during debugging.
+        verbose:    If True, print shapes during forward(). Turn off for training.
     """
 
-    def __init__(self, vocab_size: int, d_model: int):
+    def __init__(
+        self,
+        vocab_size: int,
+        d_model: int,
+        dropout_p: float = 0.1,
+        verbose: bool = False,
+    ):
         super().__init__()
 
-        # nn. Embedding is PyTorch's built-in lookup table.
-        # Shape - [vocab_size, d_model]
-        # padding_idx = 0 := no update for token "0".
-        # PAD Tokens should have gradients as 0 so that they can 
-        # stay as zero vector and don't pollute other embeddings
-
+        # The actual lookup table. Shape: [vocab_size, d_model].
+        # padding_idx=0 tells PyTorch: never update the row for token ID 0.
+        # That's our PAD token. We don't want gradients flowing through padding
+        # positions and corrupting the real token embeddings.
         self.embedding = nn.Embedding(
             num_embeddings=vocab_size,
             embedding_dim=d_model,
-            padding_idx=0
+            padding_idx=0,
         )
 
         self.d_model = d_model
-
-        # computing the scaling factor - sqrt(d_model)
         self.scale = math.sqrt(d_model)
+        self.verbose = verbose
+
+        # Dropout applied after the embedding + scale step.
+        # This is where it lives in the paper's architecture before the
+        # first encoder/decoder layer sees the input.
+        # During eval(), nn.Dropout automatically becomes a no-op.
+        self.dropout = nn.Dropout(p=dropout_p)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: Integer token IDs, shape [Batch, SeqLen] (B, T)
+            x: Token IDs, shape [B, T], dtype=torch.long
 
         Returns:
-            Float embeddings, shape [Batch, SeqLen, d_model] (B, T, d)
+            Embeddings, shape [B, T, d_model], dtype=torch.float32
         """
 
+        x = x.to(self.embedding.weight.device)
+
         assert x.dim() == 2, (
-            f"TokenEmbedding expects 2D input [B, T], got {x.dim()}D tensor of shape {x.shape}"
+            f"Expected 2D input [B, T], got shape {x.shape}"
         )
         assert x.dtype == torch.long, (
-            f"TokenEmbedding expects torch.long (int64) input, got {x.dtype}. "
-            f"Token IDs must be integers, not floats."
+            f"Expected torch.long (int64), got {x.dtype}. "
+            f"Token IDs must be integers."
         )
-        print(f" [Embedding] input  x: {x.shape}  dtype={x.dtype}")
 
-        output = self.embedding(x) * self.scale
+        if self.verbose:
+            print(f"  [Embedding] input  : {x.shape}  dtype={x.dtype}")
 
-        print(f"  [Embedding] output embeddings: {output.shape}  dtype={output.dtype}")
-        # Expected: [B, T, d_model]. If you see [B, T] you forgot the embedding layer.
-        # If you see [B, d_model] you forgot the sequence dimension (squeezed by mistake).
+        # Lookup + scale. Shape goes [B, T] -> [B, T, d_model].
+        out = self.embedding(x) * self.scale
 
-        return output
-    
+        # Apply dropout. Shape stays [B, T, d_model].
+        out = self.dropout(out)
+
+        if self.verbose:
+            print(f"  [Embedding] output : {out.shape}  dtype={out.dtype}")
+
+        return out
+
+
+# ── Shape walkthrough ─────────────────────────────────────────────────────────
+#
+# Input x:          [B, T]            e.g. [2, 5]
+#                    |   |
+#                    |   └── T: tokens per sequence
+#                    └────── B: batch size
+#
+# After embedding:  [B, T, d_model]   e.g. [2, 5, 8]
+#                    |   |   |
+#                    |   |   └── d_model: embedding dimension
+#                    |   └────── T: one vector per token (preserved)
+#                    └────────── B: each sequence looked up independently
+#
+# After * scale:    [B, T, d_model]   same shape, values scaled by sqrt(d)
+# After dropout:    [B, T, d_model]   same shape, some values zeroed randomly
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 def demonstrate_embedding():
+    torch.manual_seed(42)
 
-    torch.manual_seed(42) 
+    vocab_size = 100
+    d_model    = 8
+    batch_size = 2
+    seq_len    = 5
 
-    # Hyperparameters
-    vocab_size = 100    # Small vocab for demo
-    d_model = 8         # Tiny d_model so we can print it
-    batch_size = 2      # B = 2 sequences in the batch
-    seq_len = 5         # T = 5 tokens per sequence
+    # verbose=True so we can see shape prints during the demo
+    embed = TokenEmbedding(vocab_size, d_model, dropout_p=0.0, verbose=True)
 
-    embed = TokenEmbedding(vocab_size, d_model)
-
-    # Simulate a batch of token IDs
     # Shape: [B, T] = [2, 5]
-    # Row 0: token IDs [5, 12, 3, 7, 0]  (0 = PAD)
-    # Row 1: token IDs [8, 3, 14, 2, 11]
+    # Position [0, 4] = token ID 0 -> this is a PAD token
+    # Token ID 3 appears at [0,2] and [1,1] -> same embedding, different position
     token_ids = torch.tensor([
-        [5, 12, 3, 7, 0],
+        [5, 12, 3, 7,  0],
         [8,  3, 14, 2, 11],
     ])
-    print(f"Input shape:  {token_ids.shape}")   # [2, 5]
 
-    # Forward pass
-    embeddings = embed(token_ids)
-    print(f"Output shape: {embeddings.shape}")  # [2, 5, 8]
+    print(f"token_ids shape : {token_ids.shape}")
+    print(f"token_ids dtype : {token_ids.dtype}")
+    print()
 
-    # Verify: PAD token (ID=0) should have near-zero embedding
-    # (padding_idx=0 ensures its gradient is always zero)
-    print(f"\nPAD embedding (should be ~zero): {embeddings[0, 4, :]}")
+    # Put model in eval mode so dropout doesn't zero anything during demo
+    embed.eval()
+    with torch.no_grad():
+        embeddings = embed(token_ids)
 
-    # Verify: same token in different positions has SAME embedding
-    # Token ID 3 appears at position [0,2] and [1,1]
-    # Without positional encoding, they ARE identical this is why PE is needed.
-    same_token_pos1 = embeddings[0, 2, :]  # token 3 in sequence 0
-    same_token_pos2 = embeddings[1, 1, :]  # token 3 in sequence 1
-    print(f"\nSame token (ID=3) at two positions:")
-    print(f"  Pos [0,2]: {same_token_pos1.detach()}")
-    print(f"  Pos [1,1]: {same_token_pos2.detach()}")
-    print(f" Checking ifthey are equal? {torch.allclose(same_token_pos1, same_token_pos2)}")
-    # This SHOULD print True and this is the problem PE solves!
+    print(f"\nFinal output shape : {embeddings.shape}")  # [2, 5, 8]
 
-    return embeddings
+    # PAD token (ID=0) should be exactly zero: padding_idx=0 keeps it frozen
+    print(f"\nPAD embedding (expect all zeros) :\n  {embeddings[0, 4, :]}")
+
+    # Same token ID at two different positions -> identical embeddings
+    # This is the core problem that positional encoding (Stage 4) solves.
+    # Without PE, the model has no idea if "cat" appears first or last.
+    pos1 = embeddings[0, 2, :]   # token ID 3, sequence 0
+    pos2 = embeddings[1, 1, :]   # token ID 3, sequence 1
+    print(f"\nToken ID=3 at position [0,2] : {pos1}")
+    print(f"Token ID=3 at position [1,1] : {pos2}")
+    print(f"Equal? = {torch.allclose(pos1, pos2)}")
+    print("-> They should be. Same token = same embedding = no position info.")
+    print("  This is exactly what Stage 4 (Positional Encoding) fixes.")
 
 
-
-### Tensor Shape Walkthrough
-
-"""Here is every shape, step by step:
-
-Input token_ids:     [B, T]          e.g. [2, 5]
-                      │   │
-                      │   └── SeqLen (number of tokens per sequence)
-                      └────── Batch size
-
-After nn.Embedding:  [B, T, d_model] e.g. [2, 5, 8]
-                      │   │   │
-                      │   │   └── Embedding dimension (the "richness" of each token's repr)
-                      │   └────── SeqLen (preserved one vector per token)
-                      └────────── Batch size (preserved each sequence independently looked up)
-
-After * scale:       [B, T, d_model]  (same shape, all values scaled)"""
+if __name__ == "__main__":
+    demonstrate_embedding()
