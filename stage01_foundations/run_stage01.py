@@ -115,7 +115,7 @@ def save_checkpoint(
 
 # --------------- main -------------
 def main():
-
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"running on: {device}")
 
@@ -169,7 +169,8 @@ def main():
 
     # --- training loop ---
     print("\nstarting training...\n")
-
+    best_val_loss = float("inf")
+    
     for epoch in range(1, NUM_EPOCHS + 1):
         t0 = time.time()
 
@@ -200,14 +201,17 @@ def main():
             f"time: {elapsed:.2f}s"
         )
 
-        save_checkpoint(
-            epoch=epoch,
-            model=model,
-            optimizer=optimizer,
-            train_loss=train_loss,
-            val_loss=val_loss,
-            checkpoint_dir=CHECKPOINT_DIR,
-        )
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            save_checkpoint(
+                epoch=epoch,
+                model=model,
+                optimizer=optimizer,
+                train_loss=train_loss,
+                val_loss=val_loss,
+                checkpoint_dir=CHECKPOINT_DIR,
+            )
+            print(f"  best model updated (val_loss={val_loss:.4f})")
 
     print("\nstage 1 complete.")
 
