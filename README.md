@@ -47,6 +47,7 @@ The full Transformer architecture has been implemented and validated with:
 - gradient flow through the entire model  
 
 Next Step - <br>
+
 Training pipeline (Stage 08) will be implemented next.
 
 By the end of this project, the full Transformer model will be trained on a
