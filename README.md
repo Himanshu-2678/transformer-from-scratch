@@ -30,13 +30,14 @@ implemented, tested, and understood independently.
 
 ## Current Status
 
-- Stage 01 – Foundations ✔  
-- Stage 02 – Attention ✔  
-- Stage 03 – Multi-head Attention ✔  
-- Stage 04 – Positional Encoding ✔  
-- Stage 05 – Encoder ✔  
-- Stage 06 – Decoder ✔  
-- Stage 07 – Full Transformer ✔  
+Completed -
+- Stage 01 – Foundations    
+- Stage 02 – Attention    
+- Stage 03 – Multi-head Attention    
+- Stage 04 – Positional Encoding    
+- Stage 05 – Encoder    
+- Stage 06 – Decoder    
+- Stage 07 – Full Transformer    
 
 The full Transformer architecture has been implemented and validated with:
 
@@ -45,6 +46,7 @@ The full Transformer architecture has been implemented and validated with:
 - verified encoder–decoder interaction  
 - gradient flow through the entire model  
 
+Next Step - <br>
 Training pipeline (Stage 08) will be implemented next.
 
 By the end of this project, the full Transformer model will be trained on a
