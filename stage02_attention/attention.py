@@ -40,20 +40,39 @@ class ScaledDotProductAttention(nn.Module):
 
         # --- mask ---
         if mask is not None:
-            mask = mask.to(Q.device)
+            mask = mask.to(Q.device).bool()
 
             if mask.dim() == 2:
-                mask = mask.unsqueeze(1)         # [B, 1, T_k]
+                # [B, T_k] → [B, T_q, T_k]
+                mask = mask.unsqueeze(1).expand(-1, T_q, -1)
 
-            assert mask.shape[-1] == T_k         # fix 2
+            elif mask.dim() == 3:
+                # must already be [B, T_q, T_k]
+                assert mask.shape[1] == T_q
 
-            scores = scores.masked_fill(
-                mask == 0,
-                torch.finfo(scores.dtype).min
-            )
+            assert mask.shape[-1] == T_k
+
+            # mask scores BEFORE softmax: use -inf instead of -1e9
+            scores = scores.masked_fill(~mask, torch.finfo(scores.dtype).min)
 
         # --- weights ---
         weights = F.softmax(scores, dim=-1)
+
+        if mask is not None:
+            # detect rows where all keys are masked
+            valid_counts = mask.sum(dim=-1, keepdim=True)  # [B, T_q, 1]
+            fully_masked = (valid_counts == 0)
+
+            # expand to match weights
+            fully_masked = fully_masked.expand_as(weights)
+
+            # zero those rows
+            weights = torch.where(
+                fully_masked,
+                torch.zeros_like(weights),
+                weights
+            )
+
         weights = self.dropout(weights)
 
         # --- output ---
