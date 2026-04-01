@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from stage04_positional_encoding.positional_encoding import PositionalEncoding
 from stage05_encoder.encoder import Encoder
-from stage06_decoder.decoder import Decoder, make_causal_mask
+from stage06_decoder.decoder import Decoder
 
 
 class Transformer(nn.Module):
@@ -40,7 +40,7 @@ class Transformer(nn.Module):
 
         self.output_projection = nn.Linear(d_model, tgt_vocab_size)
 
-    def forward(self, src, tgt, src_mask=None):
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
         """
         src: [B, S]
         tgt: [B, T]
@@ -56,35 +56,15 @@ class Transformer(nn.Module):
         T = tgt.shape[1]
         device = src.device
 
-        # ---- masks (1 = keep, 0 = block) ----
+        # ---- masks (must be provided externally) ----
+        assert src_mask is not None, "src_mask must be provided"
+        assert tgt_mask is not None, "tgt_mask must be provided"
 
-        # src mask: [B, S]
-        if src_mask is None:
-            src_mask = (src != self.pad_idx).float()
+        assert src_mask.shape == (B, S), f"Expected src_mask [B,S], got {src_mask.shape}"
+        assert tgt_mask.shape == (B, T, T), f"Expected tgt_mask [B,T,T], got {tgt_mask.shape}"
 
-        assert src_mask.shape == (B, S)
         assert src_mask.device == device
-        assert src_mask.dtype == torch.float32
-        assert torch.all((src_mask == 0) | (src_mask == 1))
-
-        # causal mask: [1, T, T]
-        causal_mask = make_causal_mask(T).to(device)
-        assert causal_mask.shape == (1, T, T)
-        assert causal_mask.device == device
-        assert causal_mask.dtype == torch.float32
-
-        # tgt padding: [B, 1, T]
-        tgt_padding_mask = (tgt != self.pad_idx).float().unsqueeze(1)
-        assert tgt_padding_mask.shape == (B, 1, T)
-        assert tgt_padding_mask.device == device
-        assert tgt_padding_mask.dtype == torch.float32
-
-        # combine → [B, T, T]
-        tgt_mask = tgt_padding_mask * causal_mask
-        assert tgt_mask.shape == (B, T, T)
         assert tgt_mask.device == device
-        assert tgt_mask.dtype == torch.float32
-        assert torch.all((tgt_mask == 0) | (tgt_mask == 1))
 
         # ---- embeddings ----
 
