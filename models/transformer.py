@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from stage04_positional_encoding.positional_encoding import PositionalEncoding
 from stage05_encoder.encoder import Encoder
-from stage06_decoder.decoder import Decoder, make_causal_mask
+from stage06_decoder.decoder import Decoder
 
 
 class Transformer(nn.Module):
@@ -42,7 +42,7 @@ class Transformer(nn.Module):
         # output layer
         self.output_projection = nn.Linear(d_model, tgt_vocab_size)
 
-    def forward(self, src, tgt, src_mask=None):
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
         """
         src: [B, S]
         tgt: [B, T]
@@ -57,20 +57,15 @@ class Transformer(nn.Module):
         T = tgt.shape[1]
         device = src.device
 
-        # ---- masks ----
+        # ---- masks must be provided externally ----
+        assert src_mask is not None, "src_mask must be provided"
+        assert tgt_mask is not None, "tgt_mask must be provided"
 
-        # src padding mask: [B, S]
-        if src_mask is None:
-            src_mask = (src != self.pad_idx).float()
+        assert src_mask.shape == (B, S), f"Expected [B,S], got {src_mask.shape}"
+        assert tgt_mask.shape == (B, T, T), f"Expected [B,T,T], got {tgt_mask.shape}"
 
-        # causal mask: [1, T, T]
-        causal_mask = make_causal_mask(T).to(device)
-
-        # tgt padding mask: [B, 1, T]
-        tgt_padding_mask = (tgt != self.pad_idx).float().unsqueeze(1)
-
-        # combined tgt mask: [B, T, T]
-        tgt_mask = tgt_padding_mask * causal_mask
+        assert src_mask.device == device
+        assert tgt_mask.device == device
 
         # ---- embeddings ----
         src_emb = self.src_embedding(src) * math.sqrt(self.d_model)
