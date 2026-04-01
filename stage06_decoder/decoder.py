@@ -7,7 +7,6 @@ from stage03_multihead.multihead_attention import MultiHeadAttention
 
 
 def make_causal_mask(T: int) -> torch.Tensor:
-
     return torch.tril(torch.ones(T, T)).unsqueeze(0)
 
 
@@ -58,7 +57,7 @@ class DecoderLayer(nn.Module):
             print(f"[DecoderLayer] encoder_output: {encoder_output.shape}")
 
         # 1. Masked Self-Attention
-        attn_out, _ = self.self_attn(x, x, x, tgt_mask)
+        attn_out, self_attn_weights = self.self_attn(x, x, x, tgt_mask)
         x = self.norm1(x + self.dropout1(attn_out))
 
         # 2. Cross-Attention
@@ -70,7 +69,7 @@ class DecoderLayer(nn.Module):
         ffn_out = self.ffn(x)
         x = self.norm3(x + self.dropout3(ffn_out))
 
-        return x
+        return x, self_attn_weights
     
 
 # Decoder Stack
@@ -101,10 +100,16 @@ class Decoder(nn.Module):
         if self.verbose:
             print(f"[Decoder] input x: {x.shape}")
 
+        all_weights = []
+
         for i, layer in enumerate(self.layers):
             if self.verbose:
                 print(f"[Decoder] Layer {i}")
 
-            x = layer(x, encoder_output, tgt_mask, src_mask)
+            x, attn_w = layer(x, encoder_output, tgt_mask, src_mask)
+            all_weights.append(attn_w)
 
-        return x
+        # take last layer attention
+        final_weights = all_weights[-1]
+
+        return x, final_weights
