@@ -78,9 +78,9 @@ class Transformer(nn.Module):
         memory = self.encoder(src_emb, src_mask)
 
         # ---- decoder ----
-        out = self.decoder(tgt_emb, memory, tgt_mask, src_mask)
+        out, attn_weights = self.decoder(tgt_emb, memory, tgt_mask, src_mask)
 
         # ---- output ----
         logits = self.output_projection(out)
 
-        return logits
+        return logits, attn_weights

@@ -24,6 +24,6 @@ tgt = torch.randint(1, 100, (2, 7))   # [B=2, T=7]
 
 # ---- forward pass ----
 with torch.no_grad():
-    out = model(src, tgt)
+    out, _ = model(src, tgt)
 
 print("Output shape:", out.shape)
