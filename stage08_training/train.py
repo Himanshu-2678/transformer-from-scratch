@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.optim import Adam
 
 from models.transformer import Transformer
-
+from stage10_analysis.synthetic_tasks import generate_copy_task
 
 # =========================
 # Constants
@@ -13,15 +13,12 @@ from models.transformer import Transformer
 PAD = 0
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 # =========================
 # Hyperparameters
 # =========================
-vocab_size = 100
+vocab_size = 20          # reduced for faster learning
 d_model = 32
-num_steps = 200
-warmup_steps = 50
-
+num_steps = 2500
 
 # =========================
 # Model
@@ -39,7 +36,6 @@ model = Transformer(
     pad_idx=PAD,
 ).to(device)
 
-
 # =========================
 # Loss + Optimizer
 # =========================
@@ -47,19 +43,10 @@ criterion = nn.CrossEntropyLoss(ignore_index=PAD)
 
 optimizer = Adam(
     model.parameters(),
-    lr=1.0,  # will be scaled by scheduler
+    lr=1e-3,   # fixed LR (stable)
     betas=(0.9, 0.98),
     eps=1e-9
 )
-
-
-# =========================
-# LR Scheduler
-# =========================
-def get_lr(step, d_model, warmup_steps):
-    step = max(step, 1)
-    return (d_model ** -0.5) * min(step ** -0.5, step * (warmup_steps ** -1.5))
-
 
 # =========================
 # Training Loop
@@ -68,36 +55,43 @@ model.train()
 
 for step in range(1, num_steps + 1):
 
-    # ---- Dummy batch (fixed for overfitting test) ----
-    src = torch.tensor([[5, 6, 7, 8, 9, 0]], device=device)
-    tgt = torch.tensor([[1, 5, 6, 7, 8, 2]], device=device)
+    # ---- Synthetic COPY task ----
+    src, tgt = generate_copy_task(
+        batch_size=64,
+        seq_len=6,
+        vocab_size=vocab_size
+    )
+
+    src = src.to(device)
+    tgt = tgt.to(device)
 
     # ---- Target shift ----
-    tgt_input = tgt[:, :-1]     # [B, T-1]
-    tgt_output = tgt[:, 1:]     # [B, T-1]
+    tgt_input = tgt[:, :-1]
+    tgt_output = tgt[:, 1:]
 
     # ---- Masks ----
-    # Source mask: [B, S]
     src_mask = (src != PAD)
 
-    # Target mask
     T_len = tgt_input.size(1)
 
-    tgt_pad_mask = (tgt_input != PAD).unsqueeze(1)   # [B, 1, T]
-    
+    tgt_pad_mask = (tgt_input != PAD).unsqueeze(1)
+
     causal_mask = torch.tril(
         torch.ones(T_len, T_len, device=device)
-    ).bool().unsqueeze(0)   # [1, T, T]
+    ).bool().unsqueeze(0)
 
-    tgt_mask = tgt_pad_mask & causal_mask   # [B, T, T]
+    tgt_mask = tgt_pad_mask & causal_mask
 
     # ---- Forward ----
     logits = model(src, tgt_input, src_mask, tgt_mask)
 
+    if isinstance(logits, tuple):
+        logits = logits[0]
+
     # ---- Loss ----
     B, T_out, V = logits.shape
 
-    logits = logits.view(B * T_out, V)
+    logits = logits.reshape(B * T_out, V)
     tgt_output = tgt_output.reshape(B * T_out)
 
     loss = criterion(logits, tgt_output)
@@ -105,18 +99,17 @@ for step in range(1, num_steps + 1):
     # ---- Backward ----
     loss.backward()
 
-    # ---- Gradient clipping ----
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
-    # ---- LR update ----
-    lr = get_lr(step, d_model, warmup_steps)
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = lr
-
-    # ---- Optimizer step ----
     optimizer.step()
     optimizer.zero_grad()
 
     # ---- Logging ----
-    if step % 10 == 0:
-        print(f"Step {step:3d} | Loss: {loss.item():.6f} | LR: {lr:.6f}")
+    if step % 50 == 0:
+        print(f"Step {step:4d} | Loss: {loss.item():.6f}")
+
+# =========================
+# Save model
+# =========================
+torch.save(model.state_dict(), "checkpoint.pt")
+print("Checkpoint saved.")
