@@ -30,33 +30,129 @@ implemented, tested, and understood independently.
 
 ## Current Status
 
-Completed -
-- Stage 01 – Foundations    
-- Stage 02 – Attention    
-- Stage 03 – Multi-head Attention    
-- Stage 04 – Positional Encoding    
-- Stage 05 – Encoder    
-- Stage 06 – Decoder    
-- Stage 07 – Full Transformer    
+### Completed
+
+- Stage 01 – Foundations  
+- Stage 02 – Attention  
+- Stage 03 – Multi-head Attention  
+- Stage 04 – Positional Encoding  
+- Stage 05 – Encoder  
+- Stage 06 – Decoder  
+- Stage 07 – Full Transformer  
+- Stage 08 – Training Pipeline  
+- Stage 09 – Debugging and Validation  
+- Stage 10 – Analysis and Interpretability 
 
 The full Transformer architecture has been implemented and validated with:
 
 - correct causal masking in the decoder  
 - correct padding masking in encoder and cross-attention  
+- no future token leakage (strict causality enforcement)  
+- mask application before softmax (no post-softmax masking)  
+- stable attention computation (no NaNs, safe handling of fully masked rows)  
 - verified encoder–decoder interaction  
-- gradient flow through the entire model  
+- correct gradient flow through the entire model  
 
-Next Step - <br>
 
-Training pipeline (Stage 08) will be implemented next.
+## Training
 
-By the end of this project, the full Transformer model will be trained on a
-sequence-to-sequence task, providing hands-on understanding of how modern
-attention-based architectures work internally, and serving as a foundation
-for building small language models (SLMs).
+The model is trained on synthetic sequence-to-sequence tasks to isolate and study behavior:
 
-This project is intended for educational purposes and for developing deep intuition
-about Transformer models and attention mechanisms.
+- copy task (baseline behavior validation)  
+- structured synthetic tasks (for controlled experimentation)  
+
+Training setup includes:
+
+- teacher forcing with proper target shifting  
+- causal + padding mask composition  
+- stable optimization (Adam with fixed learning rate)  
+
+
+## Analysis and Interpretability (Stage 10)
+
+This project goes beyond implementation and training by analyzing internal Transformer behavior.
+
+Implemented analysis components:
+
+- **Attention extraction** (layer-wise, head-wise)  
+- **Entropy analysis** (attention sharpness and distribution)  
+- **Head similarity analysis** (cosine similarity across heads)  
+- **Positional behavior analysis** (diagonal patterns, attention shifts)  
+- **Causal intervention (head ablation)** to measure true importance  
+
+Key insight:
+
+- **Attention weights alone do not indicate importance.**
+- **Causal intervention (ablation) is required to measure functional contribution.**
+
+
+## Key Findings (So Far)
+
+- On simple tasks (e.g., copy task), all attention heads converge to similar behavior  
+- No head specialization emerges under low task complexity  
+- Multi-head attention can behave as replicated single-head attention when not constrained  
+- Task complexity is necessary to induce meaningful head diversity
+
+
+
+## Project Structure
+
+The repository is organized into stages:
+
+```
+transformer-from-scratch/
+│
+├── assets/
+├── experiments/
+│
+├── models/
+│   └── transformer.py
+│
+├── stage01_foundations/
+├── stage02_attention/
+├── stage03_multihead/
+├── stage04_positional_encoding/
+├── stage05_encoder/
+├── stage06_decoder/
+├── stage07_full_transformer/
+├── stage08_training/
+│   ├── train.py
+│   └── data_loader.py
+│
+├── stage09_debugging/
+├── stage10_analysis/
+│   ├── attention_utils.py
+│   ├── attn_entropy.py
+│   ├── head_similarity.py
+│   ├── positional_analysis.py
+│   ├── intervention.py
+│   ├── synthetic_tasks.py
+│   ├── run_analysis.py
+│   └── run_stage10.py
+│
+├── utils/
+│
+├── .gitignore
+├── requirements.txt
+├── README.md
+├── FINDINGS.md
+├── LICENSE
+│
+├── checkpoint.pt   (should NOT be committed)
+└── venv/           (local environment, ignored)
+
+```
+
+
+## Next Steps
+
+- Train on more complex synthetic tasks (reverse, dependency-based tasks)  
+- Induce and analyze head specialization  
+- Study cross-layer attention behavior  
+- Identify redundant vs critical heads  
+- Extend toward small language model (SLM) experimentation
+
+
 
 ## Reference
 
