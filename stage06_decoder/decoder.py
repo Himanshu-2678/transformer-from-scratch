@@ -42,34 +42,37 @@ class DecoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout_p)
         self.dropout3 = nn.Dropout(dropout_p)
 
-    def forward(self, x, encoder_output, tgt_mask=None, src_mask = None):
-        """
-        x: (B, T, d_model)
-        encoder_output: (B, S, d_model)
-        """
-
-        assert x.dim() == 3, "x must be (B, T, d_model)"
-        assert encoder_output.dim() == 3, "encoder_output must be (B, S, d_model)"
-        assert x.size(0) == encoder_output.size(0), "Batch size mismatch"
-
-        if self.verbose:
-            print(f"[DecoderLayer] x: {x.shape}")
-            print(f"[DecoderLayer] encoder_output: {encoder_output.shape}")
-
+    def forward(
+        self,
+        x,
+        encoder_output,
+        tgt_mask=None,
+        src_mask=None,
+        return_attention=False,
+        head_ablation=None
+    ):
         # 1. Masked Self-Attention
-        attn_out, self_attn_weights = self.self_attn(x, x, x, tgt_mask)
+        attn_out, self_attn_weights = self.self_attn(
+            x, x, x,
+            tgt_mask,
+            head_ablation=head_ablation
+        )
         x = self.norm1(x + self.dropout1(attn_out))
 
-        # 2. Cross-Attention
+        # 2. Cross-Attention (no ablation here for now)
         cross_out, _ = self.cross_attn(
-            x, encoder_output, encoder_output, src_mask)
+            x, encoder_output, encoder_output, src_mask
+        )
         x = self.norm2(x + self.dropout2(cross_out))
 
         # 3. Feed Forward
         ffn_out = self.ffn(x)
         x = self.norm3(x + self.dropout3(ffn_out))
 
-        return x, self_attn_weights
+        if return_attention:
+            return x, self_attn_weights
+
+        return x
     
 
 # Decoder Stack
@@ -84,32 +87,48 @@ class Decoder(nn.Module):
             for _ in range(num_layers)
         ])
 
-    def forward(self, x, encoder_output, tgt_mask=None, src_mask=None):
-        """
-        x: (B, T, d_model)
-        encoder_output: (B, S, d_model)
-        """
-
-        assert x.dim() == 3
-        assert encoder_output.dim() == 3
-        assert x.size(0) == encoder_output.size(0), \
-            f"Batch size mismatch: x {x.size(0)} vs memory {encoder_output.size(0)}"
-        assert x.size(2) == encoder_output.size(2),\
-            f"d_model mismatch: x {x.size(2)} vs memory {encoder_output.size(2)}"
-        
-        if self.verbose:
-            print(f"[Decoder] input x: {x.shape}")
-
-        all_weights = []
+    def forward(
+        self,
+        x,
+        encoder_output,
+        tgt_mask=None,
+        src_mask=None,
+        return_attention=False,
+        head_ablation_config=None
+    ):
+        attn_dict = {}
 
         for i, layer in enumerate(self.layers):
-            if self.verbose:
-                print(f"[Decoder] Layer {i}")
 
-            x, attn_w = layer(x, encoder_output, tgt_mask, src_mask)
-            all_weights.append(attn_w)
+            layer_name = f"layer_{i}"
 
-        # take last layer attention
-        final_weights = all_weights[-1]
+            # get ablation config for this layer
+            ablation = None
+            if head_ablation_config and layer_name in head_ablation_config:
+                ablation = head_ablation_config[layer_name]
 
-        return x, final_weights
+            if return_attention:
+                x, attn = layer(
+                    x,
+                    encoder_output,
+                    tgt_mask,
+                    src_mask,
+                    return_attention=True,
+                    head_ablation=ablation
+                )
+                attn_dict[layer_name] = attn
+
+            else:
+                x = layer(
+                    x,
+                    encoder_output,
+                    tgt_mask,
+                    src_mask,
+                    return_attention=False,
+                    head_ablation=ablation
+                )
+
+        if return_attention:
+            return x, attn_dict
+
+        return x
