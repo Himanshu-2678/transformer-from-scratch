@@ -30,7 +30,7 @@ class MultiHeadAttention(nn.Module):
             verbose=verbose
         )
 
-    def forward(self, Q, K, V, mask=None):
+    def forward(self, Q, K, V, mask=None, head_ablation=None):
 
         assert Q.dim() == 3 and K.dim() == 3 and V.dim() == 3
         assert Q.shape[0] == K.shape[0] == V.shape[0]
@@ -74,10 +74,24 @@ class MultiHeadAttention(nn.Module):
             attn_mask = attn_mask.expand(B, h, T_q, T_k).reshape(B * h, T_q, T_k)
 
         # attention
-        out, weights = self.attention(Q, K, V, attn_mask)
+        out, weights = self.attention(
+            Q, K, V,
+            mask=attn_mask,
+            head_ablation=None,   
+            num_heads=self.num_heads
+        )
 
         # restore heads
         out = out.reshape(B, h, T_q, self.d_k)
+
+        # ---- HEAD ABLATION ----
+        if head_ablation is not None:
+            mask = torch.ones(h, device=out.device)
+            mask[head_ablation] = 0.0
+            mask = mask.view(1, h, 1, 1)
+            out = out * mask
+
+        # merge heads
         out = out.transpose(1, 2)
         out = out.reshape(B, T_q, self.d_model)
 
