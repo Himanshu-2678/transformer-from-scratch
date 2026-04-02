@@ -42,11 +42,18 @@ class Transformer(nn.Module):
         # output layer
         self.output_projection = nn.Linear(d_model, tgt_vocab_size)
 
-    def forward(self, src, tgt, src_mask=None, tgt_mask=None):
+    def forward(
+        self,
+        src,
+        tgt,
+        src_mask,
+        tgt_mask,
+        return_attention=False,
+        head_ablation_config=None
+    ):
         """
         src: [B, S]
         tgt: [B, T]
-        returns: [B, T, vocab]
         """
 
         assert src.dim() == 2
@@ -57,15 +64,12 @@ class Transformer(nn.Module):
         T = tgt.shape[1]
         device = src.device
 
-        # ---- masks must be provided externally ----
-        assert src_mask is not None, "src_mask must be provided"
-        assert tgt_mask is not None, "tgt_mask must be provided"
+        # ---- masks ----
+        assert src_mask is not None
+        assert tgt_mask is not None
 
-        assert src_mask.shape == (B, S), f"Expected [B,S], got {src_mask.shape}"
-        assert tgt_mask.shape == (B, T, T), f"Expected [B,T,T], got {tgt_mask.shape}"
-
-        assert src_mask.device == device
-        assert tgt_mask.device == device
+        assert src_mask.shape == (B, S)
+        assert tgt_mask.shape == (B, T, T)
 
         # ---- embeddings ----
         src_emb = self.src_embedding(src) * math.sqrt(self.d_model)
@@ -78,9 +82,29 @@ class Transformer(nn.Module):
         memory = self.encoder(src_emb, src_mask)
 
         # ---- decoder ----
-        out, attn_weights = self.decoder(tgt_emb, memory, tgt_mask, src_mask)
+        if return_attention:
+            out, attn_weights = self.decoder(
+                tgt_emb,
+                memory,
+                tgt_mask,
+                src_mask,
+                return_attention=True,
+                head_ablation_config=head_ablation_config
+            )
+        else:
+            out = self.decoder(
+                tgt_emb,
+                memory,
+                tgt_mask,
+                src_mask,
+                return_attention=False,
+                head_ablation_config=head_ablation_config
+            )
 
         # ---- output ----
         logits = self.output_projection(out)
 
-        return logits, attn_weights
+        if return_attention:
+            return logits, attn_weights
+
+        return logits
