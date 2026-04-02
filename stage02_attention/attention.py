@@ -20,6 +20,8 @@ class ScaledDotProductAttention(nn.Module):
         K: torch.Tensor,           # [B, T_k, d_k]
         V: torch.Tensor,           # [B, T_k, d_v]
         mask: torch.Tensor | None = None,
+        head_ablation=None,
+        num_heads=None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
 
         # --- shape checks ---
@@ -72,6 +74,25 @@ class ScaledDotProductAttention(nn.Module):
                 torch.zeros_like(weights),
                 weights
             )
+
+        # ---- HEAD ABLATION ----
+        if head_ablation is not None:
+            assert num_heads is not None, "num_heads required for ablation"
+
+            B_h = weights.shape[0]   # = B * H
+            T_q, T_k = weights.shape[1], weights.shape[2]
+
+            H = num_heads
+            B = B_h // H
+
+            # reshape to recover head dimension
+            weights = weights.view(B, H, T_q, T_k)
+
+            # zero selected heads
+            weights[:, head_ablation, :, :] = 0.0
+
+            # flatten back
+            weights = weights.view(B * H, T_q, T_k)
 
         weights = self.dropout(weights)
 
