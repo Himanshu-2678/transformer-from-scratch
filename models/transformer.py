@@ -48,7 +48,7 @@ class Transformer(nn.Module):
         tgt,
         src_mask,
         tgt_mask,
-        return_attention=False,
+        return_attention=True,
         head_ablation_config=None
     ):
         """
