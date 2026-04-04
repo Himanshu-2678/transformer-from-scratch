@@ -59,8 +59,8 @@ class DecoderLayer(nn.Module):
         )
         x = self.norm1(x + self.dropout1(attn_out))
 
-        # 2. Cross-Attention (no ablation here for now)
-        cross_out, _ = self.cross_attn(
+        # 2. Cross-Attention 
+        cross_out, cross_attn_weights = self.cross_attn(
             x, encoder_output, encoder_output, src_mask
         )
         x = self.norm2(x + self.dropout2(cross_out))
@@ -70,7 +70,9 @@ class DecoderLayer(nn.Module):
         x = self.norm3(x + self.dropout3(ffn_out))
 
         if return_attention:
-            return x, self_attn_weights
+            return x, {
+                "self": self_attn_weights,
+                "cross": cross_attn_weights}
 
         return x
     
