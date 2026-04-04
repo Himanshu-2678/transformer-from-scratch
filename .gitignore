@@ -2,4 +2,6 @@ venv/
 experiments/
 __pycache__/
 *.pyc
-checkpoint.pt
+checkpoint_reverse.pt
+checkpoint_copy.pt
+checkpoint_kv.pt
