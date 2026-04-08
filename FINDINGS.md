@@ -1,133 +1,287 @@
-# Transformer Analysis Findings
+# Transformer Head Specialization Analysis
 
-## 1. Experimental Setup
+---
 
-We analyze a small-scale encoder–decoder Transformer to study attention head behavior under varying task complexity.
+## Overview
 
-- Architecture: Encoder–Decoder Transformer (Post LayerNorm)  
-- d_model: 32  
-- Heads: 4  
-- Layers: 2 encoder, 2 decoder  
-- Training: Adam (lr = 1e-3), no scheduler, no dropout  
+This project investigates whether attention head specialization emerges in transformer models and whether such specialization corresponds to meaningful functional roles and causal importance.
 
-Tasks evaluated:
+A controlled encoder decoder transformer was trained from scratch on progressively complex tasks. A structured analysis pipeline was developed to evaluate attention behavior across entropy, similarity, positional bias, and ablation impact.
 
-- Copy task (baseline, positional identity)  
-- Reverse task (positional transformation, seq_len = 16)  
-- Key–Value (KV) task (content-based retrieval)  
+The investigation was conducted through three core experiments followed by a robustness validation step.
 
+---
 
+## Model Configuration
 
-## 2. Validation
+- Architecture: Encoder Decoder Transformer (Post LayerNorm)
+- d_model: 32
+- Heads: 4
+- Layers: 2 encoder and 2 decoder layers
+- Optimizer: Adam (lr = 1e-3)
+- No dropout or scheduler
+- Framework: PyTorch (custom implementation)
 
-Before analysis, correctness of the implementation was verified:
+---
 
-- Causal and padding masks are correctly applied  
-- No future token leakage is observed  
-- Attention weights are properly normalized  
-- No numerical instability (NaNs) during training  
-- Attention weights are extracted per layer and per head  
+## Tasks
 
-All tasks converge successfully, with near-zero training loss and correct outputs.
+### Copy Task
+Input sequence is reproduced exactly at the output.
 
+Purpose:
+Baseline identity mapping.
 
+---
 
-## 3. Methodology
+### Reverse Task
+Input sequence is reversed.
 
-We evaluate attention behavior using the following metrics:
+Purpose:
+Introduces positional complexity without content lookup.
 
-- **Entropy**: Measures sharpness versus diffuseness of attention  
-- **Head Similarity**: Measures redundancy across heads  
-- **Positional Analysis**: Measures alignment with diagonal attention patterns (used for copy and reverse)  
-- **Ablation Impact**: Measures causal importance of individual heads  
+---
 
-All metrics are computed over aggregated batches after training.
+### Key Value Task
+Input:
+[K1, V1, K2, V2, ...]
 
+Target:
+[V1, V1, V2, V2, ...]
 
+Purpose:
+Forces content based retrieval.
 
-## 4. Results
+---
 
-### 4.1 Copy Task
+## Analysis Pipeline
 
-The copy task serves as a baseline with minimal complexity.
+- Attention entropy for sharpness
+- Head similarity for redundancy
+- Positional analysis using relative positions
+- Per token entropy for dynamic behavior
+- Ablation for causal importance
 
-Attention exhibits strong diagonal structure, where each position attends primarily to itself. Entropy is low in early layers, indicating sharp and focused attention, while deeper layers show slightly higher entropy due to residual mixing.
+---
 
-Head similarity is high, especially in deeper layers, indicating that multiple heads converge to nearly identical behavior. Ablation experiments show minimal variation in loss across heads, confirming that no individual head plays a distinct role.
+# Experiment 1: Emergence of Head Specialization
 
-Overall, the model learns a symmetric identity mapping with highly redundant attention heads.
+## Objective
 
+Determine whether specialization emerges under increasing task complexity.
 
+---
 
-### 4.2 Reverse Task
+## Observations
 
-The reverse task introduces non-trivial positional dependency, requiring mapping from position *i* to position *T − i*.
+### Copy Task
 
-Despite this increased complexity, attention patterns remain largely diagonal. No anti-diagonal or reverse-aligned structure is observed.
+- Strong diagonal attention
+- Low entropy
+- High head similarity
+- Uniform ablation impact
 
-Entropy shows slightly higher variance in early layers, suggesting minor differentiation across heads. However, head similarity remains high and, in some cases, exceeds that of the copy task, indicating even stronger redundancy.
+Conclusion:
+No specialization.
 
-Ablation results do not reveal any head-specific importance. All heads contribute similarly, and no functional specialization is observed.
+---
 
+### Reverse Task
 
+- Attention remains diagonal
+- No reverse pattern
+- High similarity persists
+- No head-specific importance
 
-### 4.3 Key–Value (KV) Task
+Conclusion:
+Positional complexity does not induce specialization.
 
-The KV task introduces content-based dependency, requiring the model to retrieve values associated with keys.
+---
 
-Unlike positional tasks, this setup forces attention to act as a retrieval mechanism.
+### Key Value Task
 
-In this setting, a partial shift in behavior is observed:
+- Successful content retrieval
+- Early layer shows reduced similarity
+- Entropy varies across heads
+- Deeper layer remains redundant
 
-- Early layer heads exhibit increased entropy variance, indicating differentiated attention patterns  
-- Head similarity in early layers decreases compared to positional tasks, with no strongly redundant head pairs  
-- Some heads become highly focused, while others remain more diffuse  
+Conclusion:
+Specialization begins to emerge in early layers.
 
-However, deeper layers remain highly redundant, with head similarity remaining close to previous tasks.
+---
 
-This indicates that specialization begins to emerge, but is limited to early layers.
+## Key Insight
 
+Specialization is not inherent. It is task dependent and layer dependent.
 
+---
 
-## 5. Key Findings
+# Experiment 2: Functional Role Identification
 
-1. Increasing positional complexity (copy to reverse) does not induce attention head specialization  
-2. The model solves reverse mapping without developing structured attention patterns  
-3. Content-based tasks (KV) introduce measurable differentiation across heads  
-4. Specialization emerges partially and is concentrated in early layers  
-5. Deeper layers remain highly redundant across all tasks  
+## Objective
 
+Identify what each attention head is doing.
 
+---
 
-## 6. Interpretation
+## Method
 
-These results indicate that attention is not the primary mechanism used for solving positional transformations in this setting.
+- Convert attention to relative position distributions
+- Compute entropy and variance
+- Add per token entropy
+- Classify heads into:
+  - identity
+  - content
+  - diffuse
 
-Instead, the model likely relies on:
+---
 
-- positional encodings  
-- feedforward transformations  
-- residual connections  
+## Observations
 
-However, when the task requires content-based retrieval, attention becomes functionally relevant, leading to partial specialization.
+### Layer 0
 
-The emergence of specialization is therefore task-dependent and layer-dependent, rather than an inherent property of the architecture.
+- Multiple heads show low mean entropy and high variance across tokens
+- These heads behave as content retrieval heads
+- One head shows stable low entropy and acts as identity
 
+### Layer 1
 
+- All heads show high entropy
+- Low variability across tokens
+- Classified as diffuse
 
-## 7. Conclusion
+---
 
-Attention head specialization is not an inherent property of Transformers.
+## Interpretation
 
-It does not emerge from positional complexity alone. Instead, specialization begins to appear when the task requires content-based reasoning, but remains limited in scope and does not uniformly affect all layers.
+- Content heads perform dynamic retrieval
+- Identity head preserves structural information
+- Deeper layer collapses into general mixing
 
-These findings suggest that meaningful head specialization requires both sufficient task complexity and appropriate architectural capacity.
+---
 
+## Key Insight
 
+Functional specialization exists in early layers but does not persist in deeper layers.
 
-## 8. Next Steps
+---
 
-- Perform functional classification of heads (identity, shift, global, content-based)  
-- Analyze attention patterns in KV task at head level  
-- Evaluate causal importance using structured ablation  
-- Study scaling effects on specialization (number of heads, layers)
+# Experiment 3: Causal Importance of Head Types
+
+## Objective
+
+Test whether different head types are actually important.
+
+---
+
+## Method
+
+- Group heads into content, identity, diffuse
+- Perform targeted ablation
+- Measure loss increase
+
+### Controlled Ablation
+
+- Remove equal number of heads per group
+- Use random sampling for fairness
+
+---
+
+## Observations
+
+### Single Comparison
+
+- Removing content heads increases loss more
+- But result is biased by group size
+
+### Controlled Ablation (k = 1)
+
+- Removing one identity head causes much higher loss than removing one content head
+
+---
+
+## Interpretation
+
+- Identity head is a structural bottleneck
+- Content heads distribute computation
+- Not all content heads contribute equally
+
+---
+
+## Key Insight
+
+Head importance is asymmetric. Identity heads are individually critical, while content heads are distributed.
+
+---
+
+# Experiment 4: Robustness via Multi Run Ablation
+
+## Objective
+
+Verify that causal findings are stable.
+
+---
+
+## Method
+
+- Repeat controlled ablation multiple times
+- Compute mean and standard deviation
+
+---
+
+## Observations
+
+### Layer 0
+
+- Identity head:
+  - High mean loss increase
+  - Near zero variance
+
+- Content heads:
+  - Lower mean loss increase
+  - High variance across runs
+
+### Layer 1
+
+- Diffuse heads:
+  - Low impact
+  - Low variance
+
+---
+
+## Interpretation
+
+- Identity head importance is consistent and deterministic
+- Content head importance is uneven and variable
+- Deeper layers are stable but weak contributors
+
+---
+
+## Final Insight
+
+Content computation is not uniformly distributed. Only some content heads are truly important.
+
+---
+
+# Final Conclusion
+
+1. Specialization does not emerge in simple or positional tasks  
+2. Content based tasks induce specialization in early layers  
+3. Heads can be categorized into identity, content, and diffuse roles  
+4. Identity heads act as critical bottlenecks  
+5. Content heads perform distributed but uneven computation  
+6. Deeper layers are diffuse and redundant  
+
+---
+
+## Overall Contribution
+
+This project demonstrates that attention head specialization is conditional, layer dependent, and functionally asymmetric. It provides both behavioral and causal evidence, moving beyond surface level analysis toward mechanistic understanding.
+
+---
+
+## Future Scope
+
+- Scaling to larger models and longer sequences  
+- Testing across different architectures  
+- Studying interaction with feedforward layers  
