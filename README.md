@@ -80,18 +80,25 @@ Implemented analysis components:
 - **Positional behavior analysis** (diagonal patterns, attention shifts)  
 - **Causal intervention (head ablation)** to measure true importance  
 
-Key insight:
+Key insights:
 
 - **Attention weights alone do not indicate importance.**
 - **Causal intervention (ablation) is required to measure functional contribution.**
+- **Head behavior must be analyzed at both global and per-token levels to distinguish positional vs content-based roles.**
 
 
-## Key Findings (So Far)
+## Key Findings
 
-- On simple tasks (e.g., copy task), all attention heads converge to similar behavior  
-- No head specialization emerges under low task complexity  
-- Multi-head attention can behave as replicated single-head attention when not constrained  
-- Task complexity is necessary to induce meaningful head diversity
+- Attention head specialization does not emerge in simple or purely positional tasks (copy, reverse)  
+- Content-based tasks induce specialization, primarily in early layers  
+- Attention heads can be functionally categorized into:
+  - identity (structural preservation)
+  - content-based (dynamic retrieval)
+  - diffuse (global mixing)  
+- Identity heads act as critical structural bottlenecks with high per-head importance  
+- Content heads perform distributed retrieval, but their importance is uneven across heads  
+- Deeper layers exhibit diffuse and highly redundant behavior with low individual head importance  
+- Head importance is asymmetric and must be evaluated using controlled causal ablation, not attention weights alone  
 
 
 
@@ -146,11 +153,11 @@ transformer-from-scratch/
 
 ## Next Steps
 
-- Train on more complex synthetic tasks (reverse, dependency-based tasks)  
-- Induce and analyze head specialization  
-- Study cross-layer attention behavior  
-- Identify redundant vs critical heads  
-- Extend toward small language model (SLM) experimentation
+- Validate findings across multiple random seeds for stronger statistical reliability  
+- Test robustness under longer sequence lengths and increased task complexity  
+- Extend analysis to larger models and higher head counts  
+- Investigate interaction between attention heads and feedforward layers  
+- Explore scaling behavior toward small language model (SLM) settings  
 
 
 
