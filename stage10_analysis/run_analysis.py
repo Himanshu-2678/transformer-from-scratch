@@ -1,6 +1,9 @@
 # stage10_analysis/run_analysis.py
 
 import torch
+import random 
+import numpy as np
+
 
 from stage10_analysis.attention_utils import collect_attention
 from stage10_analysis.attn_entropy import summarize_entropy
@@ -15,6 +18,13 @@ from stage10_analysis.positional_analysis import (
 )
 from stage10_analysis.intervention import measure_ablation_impact
 
+from stage10_analysis.positional_analysis import (
+    compute_relative_position_distribution,
+    summarize_head_behavior,
+    classify_heads
+)
+
+from stage10_analysis.positional_analysis import compute_per_token_entropy
 
 def run_attention_analysis(
     model,
@@ -93,6 +103,91 @@ def run_attention_analysis(
         peaks = detect_positional_peaks(profile)
         diag = compute_diagonal_strength(attn)
 
+        # ---- Functional Role Analysis ----
+        rel_pos_dist = compute_relative_position_distribution(attn)
+        summaries = summarize_head_behavior(rel_pos_dist)
+
+        # ---- Per-token entropy ----
+        token_entropy = compute_per_token_entropy(attn)
+
+        # ---- Classification ----
+        labels = classify_heads(summaries, token_entropy)
+
+        # ---- Group heads by type ----
+        head_groups = {
+            "content": [],
+            "identity": [],
+            "diffuse": [],
+            "other": []
+        }
+
+        for i, l in enumerate(labels):
+            if l in head_groups:
+                head_groups[l].append(i)
+            else:
+                head_groups["other"].append(i)
+
+        # ---- Print roles ----
+        print(f"\n[Layer {layer} - Head Functional Roles]")
+        for i, (s, l) in enumerate(zip(summaries, labels)):
+            print(
+                f"Head {i}: {l} | "
+                f"peak={s['peak_r']}, "
+                f"entropy={s['entropy']:.3f}, "
+                f"var={s['variance']:.3f}"
+            )
+
+        print(f"\n[Layer {layer} - Per-token Entropy]")
+        for i, e in enumerate(token_entropy):
+            print(
+                f"Head {i}: mean={e['mean_entropy']:.3f}, std={e['std_entropy']:.3f}"
+            )
+
+        # ---- Causal Ablation ----
+        print(f"\n[Layer {layer} - Controlled Causal Ablation]")
+
+        # Find minimum group size (excluding empty)
+        valid_groups = [heads for heads in head_groups.values() if len(heads) > 0]
+        min_k = min(len(h) for h in valid_groups)
+
+        k = 1          # number of heads to remove
+        num_trials = 10  # number of random runs
+
+        for group_name, heads in head_groups.items():
+            if len(heads) < k:
+                continue
+            
+            deltas = []
+            for _ in range(num_trials):
+
+                # Randomly sample k heads
+                sampled_heads = random.sample(heads, k)
+
+                config = {
+                    layer: sampled_heads
+                }
+
+                result = measure_ablation_impact(
+                    model,
+                    src,
+                    tgt_input,
+                    tgt_output,
+                    src_mask,
+                    tgt_mask,
+                    loss_fn,
+                    config
+                )
+
+                deltas.append(result["delta"])
+
+            mean_delta = np.mean(deltas)
+            std_delta = np.std(deltas)
+
+            print(
+                f"{group_name}: mean_delta={mean_delta:.4f} ± {std_delta:.4f} "
+                f"(n={num_trials})"
+            )
+
         positional_profiles[layer] = profile.detach().cpu()
         positional_peaks[layer] = peaks
         diagonal_strength[layer] = diag.detach().cpu()
@@ -151,7 +246,7 @@ def run_attention_analysis(
 
 if __name__ == "__main__":
     from models.transformer import Transformer
-    from stage10_analysis.tasks.reverse import generate_reverse_task
+    from stage10_analysis.tasks.kv import generate_kv_task
 
     PAD = 0
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -176,9 +271,9 @@ if __name__ == "__main__":
     # Dummy dataloader (simple loop)
     def simple_dataloader(num_batches=10):
         for _ in range(num_batches):
-            src, tgt_input, tgt_output = generate_reverse_task(
+            src, tgt_input, tgt_output = generate_kv_task(
                 batch_size=32,
-                seq_len=6,
+                num_pairs=4,
                 vocab_size=vocab_size,
                 device=device
             )
