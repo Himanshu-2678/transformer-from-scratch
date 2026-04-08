@@ -1,6 +1,5 @@
 # Transformer Head Specialization Analysis
 
----
 
 ## Overview
 
@@ -9,8 +8,6 @@ This project investigates whether attention head specialization emerges in trans
 A controlled encoder decoder transformer was trained from scratch on progressively complex tasks. A structured analysis pipeline was developed to evaluate attention behavior across entropy, similarity, positional bias, and ablation impact.
 
 The investigation was conducted through three core experiments followed by a robustness validation step.
-
----
 
 ## Model Configuration
 
@@ -22,7 +19,7 @@ The investigation was conducted through three core experiments followed by a rob
 - No dropout or scheduler
 - Framework: PyTorch (custom implementation)
 
----
+ 
 
 ## Tasks
 
@@ -32,7 +29,7 @@ Input sequence is reproduced exactly at the output.
 Purpose:
 Baseline identity mapping.
 
----
+ 
 
 ### Reverse Task
 Input sequence is reversed.
@@ -40,7 +37,7 @@ Input sequence is reversed.
 Purpose:
 Introduces positional complexity without content lookup.
 
----
+ 
 
 ### Key Value Task
 Input:
@@ -52,7 +49,7 @@ Target:
 Purpose:
 Forces content based retrieval.
 
----
+ 
 
 ## Analysis Pipeline
 
@@ -62,7 +59,7 @@ Forces content based retrieval.
 - Per token entropy for dynamic behavior
 - Ablation for causal importance
 
----
+ 
 
 # Experiment 1: Emergence of Head Specialization
 
@@ -70,7 +67,7 @@ Forces content based retrieval.
 
 Determine whether specialization emerges under increasing task complexity.
 
----
+ 
 
 ## Observations
 
@@ -84,7 +81,7 @@ Determine whether specialization emerges under increasing task complexity.
 Conclusion:
 No specialization.
 
----
+ 
 
 ### Reverse Task
 
@@ -96,7 +93,7 @@ No specialization.
 Conclusion:
 Positional complexity does not induce specialization.
 
----
+ 
 
 ### Key Value Task
 
@@ -108,13 +105,13 @@ Positional complexity does not induce specialization.
 Conclusion:
 Specialization begins to emerge in early layers.
 
----
+ 
 
 ## Key Insight
 
 Specialization is not inherent. It is task dependent and layer dependent.
 
----
+ 
 
 # Experiment 2: Functional Role Identification
 
@@ -122,7 +119,7 @@ Specialization is not inherent. It is task dependent and layer dependent.
 
 Identify what each attention head is doing.
 
----
+ 
 
 ## Method
 
@@ -134,7 +131,7 @@ Identify what each attention head is doing.
   - content
   - diffuse
 
----
+ 
 
 ## Observations
 
@@ -150,7 +147,7 @@ Identify what each attention head is doing.
 - Low variability across tokens
 - Classified as diffuse
 
----
+ 
 
 ## Interpretation
 
@@ -158,13 +155,13 @@ Identify what each attention head is doing.
 - Identity head preserves structural information
 - Deeper layer collapses into general mixing
 
----
+ 
 
 ## Key Insight
 
 Functional specialization exists in early layers but does not persist in deeper layers.
 
----
+ 
 
 # Experiment 3: Causal Importance of Head Types
 
@@ -172,7 +169,7 @@ Functional specialization exists in early layers but does not persist in deeper 
 
 Test whether different head types are actually important.
 
----
+ 
 
 ## Method
 
@@ -185,7 +182,7 @@ Test whether different head types are actually important.
 - Remove equal number of heads per group
 - Use random sampling for fairness
 
----
+ 
 
 ## Observations
 
@@ -198,7 +195,7 @@ Test whether different head types are actually important.
 
 - Removing one identity head causes much higher loss than removing one content head
 
----
+ 
 
 ## Interpretation
 
@@ -206,13 +203,13 @@ Test whether different head types are actually important.
 - Content heads distribute computation
 - Not all content heads contribute equally
 
----
+ 
 
 ## Key Insight
 
 Head importance is asymmetric. Identity heads are individually critical, while content heads are distributed.
 
----
+ 
 
 # Experiment 4: Robustness via Multi Run Ablation
 
@@ -220,14 +217,14 @@ Head importance is asymmetric. Identity heads are individually critical, while c
 
 Verify that causal findings are stable.
 
----
+ 
 
 ## Method
 
 - Repeat controlled ablation multiple times
 - Compute mean and standard deviation
 
----
+ 
 
 ## Observations
 
@@ -247,7 +244,7 @@ Verify that causal findings are stable.
   - Low impact
   - Low variance
 
----
+ 
 
 ## Interpretation
 
@@ -255,13 +252,13 @@ Verify that causal findings are stable.
 - Content head importance is uneven and variable
 - Deeper layers are stable but weak contributors
 
----
+ 
 
 ## Final Insight
 
 Content computation is not uniformly distributed. Only some content heads are truly important.
 
----
+ 
 
 # Final Conclusion
 
@@ -272,13 +269,13 @@ Content computation is not uniformly distributed. Only some content heads are tr
 5. Content heads perform distributed but uneven computation  
 6. Deeper layers are diffuse and redundant  
 
----
+ 
 
 ## Overall Contribution
 
 This project demonstrates that attention head specialization is conditional, layer dependent, and functionally asymmetric. It provides both behavioral and causal evidence, moving beyond surface level analysis toward mechanistic understanding.
 
----
+ 
 
 ## Future Scope
 
